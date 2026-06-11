@@ -117,6 +117,26 @@ class ExamApiTest extends TestCase
             ->assertJson(['skor' => 100.0, 'jumlah_benar' => 2, 'lulus' => true]);
     }
 
+    public function test_violation_auto_submit_dan_blokir(): void
+    {
+        [$siswa, $test] = $this->buildExam();
+        $test->update(['max_pelanggaran' => 2]);
+        Sanctum::actingAs($siswa);
+
+        $attemptId = $this->postJson("/api/exams/{$test->id}/start", [])->json('attempt_id');
+
+        $this->postJson("/api/attempts/{$attemptId}/violation")
+            ->assertOk()
+            ->assertJson(['pelanggaran' => 1, 'finished' => false, 'blocked' => false]);
+
+        $this->postJson("/api/attempts/{$attemptId}/violation")
+            ->assertOk()
+            ->assertJson(['pelanggaran' => 2, 'finished' => true, 'blocked' => true]);
+
+        $this->assertTrue($siswa->fresh()->isBlocked());
+        $this->assertSame($test->id, (int) $siswa->fresh()->diblokir_test_id);
+    }
+
     public function test_tidak_bisa_akses_attempt_siswa_lain(): void
     {
         [$siswa, $test, $kunci] = $this->buildExam();

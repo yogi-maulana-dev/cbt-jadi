@@ -143,6 +143,49 @@ class ExamController extends Controller
         return response()->json($this->resultPayload($attempt));
     }
 
+    /**
+     * Catat pelanggaran (siswa keluar dari aplikasi saat ujian).
+     * Capai ambang -> auto-submit + blokir akun (sama seperti versi web).
+     */
+    public function violation(TestAttempt $attempt, ExamSessionService $service)
+    {
+        $this->authorizeAttempt($attempt);
+
+        $max = (int) $attempt->test->max_pelanggaran;
+
+        if ($attempt->status === AttemptStatus::Selesai || $max <= 0) {
+            return response()->json([
+                'pelanggaran' => $attempt->pelanggaran,
+                'max' => $max,
+                'finished' => $attempt->status === AttemptStatus::Selesai,
+                'blocked' => false,
+            ]);
+        }
+
+        $attempt->increment('pelanggaran');
+        $finished = false;
+        $blocked = false;
+
+        if ($attempt->pelanggaran >= $max) {
+            $attempt->user->blokir(sprintf(
+                'Ujian "%s" — %d× keluar aplikasi',
+                $attempt->test->judul,
+                $attempt->pelanggaran,
+            ), $attempt->test_id);
+
+            $service->finish($attempt);
+            $finished = true;
+            $blocked = true;
+        }
+
+        return response()->json([
+            'pelanggaran' => $attempt->pelanggaran,
+            'max' => $max,
+            'finished' => $finished,
+            'blocked' => $blocked,
+        ]);
+    }
+
     // ----------------- helpers -----------------
 
     private function authorizeAttempt(TestAttempt $attempt): void

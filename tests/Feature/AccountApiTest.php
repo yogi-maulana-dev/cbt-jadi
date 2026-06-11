@@ -56,6 +56,30 @@ class AccountApiTest extends TestCase
         ))->assertStatus(422);
     }
 
+    public function test_blocked_status_endpoint(): void
+    {
+        $user = $this->user();
+
+        $this->postJson('/api/blocked-status', ['email' => 'a@a.test'])
+            ->assertOk()->assertJson(['diblokir' => false]);
+
+        $user->update(['diblokir' => true]);
+
+        $this->postJson('/api/blocked-status', ['email' => 'a@a.test'])
+            ->assertOk()->assertJson(['diblokir' => true]);
+    }
+
+    public function test_user_diblokir_tidak_bisa_login(): void
+    {
+        $user = $this->user();
+        $user->update(['diblokir' => true]);
+
+        $this->postJson('/api/login', array_merge(
+            ['email' => 'a@a.test', 'password' => 'password'],
+            $this->captchaPayload()
+        ))->assertStatus(422);
+    }
+
     public function test_edit_profil(): void
     {
         $user = $this->user();

@@ -34,6 +34,16 @@ class ExamRoom extends Component
         $this->attemptId = $attempt->id;
         $this->pelanggaran = (int) ($attempt->pelanggaran ?? 0);
 
+        // Self-heal: attempt tanpa deadline (lama / dibuat manual) -> hitung dari durasi.
+        if ($attempt->deadline === null) {
+            $attempt->loadMissing('test');
+            $mulai = $attempt->waktu_mulai ?? now();
+            $attempt->update([
+                'waktu_mulai' => $mulai,
+                'deadline' => $mulai->copy()->addMinutes($attempt->test->durasi ?? 60),
+            ]);
+        }
+
         // Sudah selesai atau lewat deadline -> langsung tutup & ke hasil.
         if ($attempt->status === AttemptStatus::Selesai || $attempt->isExpired()) {
             $this->closeAttempt();
@@ -193,6 +203,13 @@ class ExamRoom extends Component
         $this->pelanggaran = $attempt->pelanggaran;
 
         if ($this->pelanggaran >= $max) {
+            // Capai ambang -> blokir login siswa (wajib dibuka admin/operator).
+            auth()->user()->blokir(sprintf(
+                'Ujian "%s" — %d× keluar tab',
+                $this->attempt->test->judul,
+                $this->pelanggaran,
+            ), $this->attempt->test_id);
+
             return $this->closeAttempt();
         }
 

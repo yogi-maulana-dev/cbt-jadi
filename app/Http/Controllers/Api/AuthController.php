@@ -40,6 +40,12 @@ class AuthController extends Controller
             ]);
         }
 
+        if ($user->isBlocked()) {
+            throw ValidationException::withMessages([
+                'email' => ['Akun diblokir karena pelanggaran ujian. Hubungi operator/admin.'],
+            ]);
+        }
+
         $token = $user->createToken($data['device_name'] ?? 'android')->plainTextToken;
 
         return response()->json([
@@ -61,5 +67,17 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Cek status blokir sebuah email (untuk polling real-time di klien).
+     */
+    public function blockedStatus(Request $request)
+    {
+        $data = $request->validate(['email' => ['required', 'email']]);
+
+        return response()->json([
+            'diblokir' => (bool) User::where('email', $data['email'])->value('diblokir'),
+        ]);
     }
 }

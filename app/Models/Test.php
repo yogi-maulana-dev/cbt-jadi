@@ -52,7 +52,7 @@ class Test extends Model
     public function questions(): BelongsToMany
     {
         return $this->belongsToMany(Question::class, 'test_question')
-            ->withPivot(['urutan', 'bobot'])
+            ->withPivot(['urutan', 'bobot', 'cadangan'])
             ->withTimestamps()
             ->orderByPivot('urutan');
     }

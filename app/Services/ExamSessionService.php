@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\AttemptStatus;
 use App\Models\Test;
 use App\Models\TestAttempt;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 class ExamSessionService
@@ -26,7 +27,11 @@ class ExamSessionService
             return $existing;
         }
 
-        return DB::transaction(function () use ($test, $userId) {
+        // Ujian ulang setelah buka blokir -> pakai SOAL CADANGAN.
+        $user = User::find($userId);
+        $pakaiCadangan = $user && (int) $user->cadangan_test_id === $test->id;
+
+        return DB::transaction(function () use ($test, $userId, $user, $pakaiCadangan) {
             $attempt = TestAttempt::create([
                 'test_id' => $test->id,
                 'user_id' => $userId,
@@ -35,7 +40,19 @@ class ExamSessionService
                 'status' => AttemptStatus::SedangDikerjakan,
             ]);
 
-            $questions = $test->questions()->with('choices')->get();
+            $questions = $test->questions()
+                ->wherePivot('cadangan', $pakaiCadangan)
+                ->with('choices')
+                ->get();
+
+            // Fallback: bila tidak ada soal cadangan, pakai soal utama.
+            if ($pakaiCadangan && $questions->isEmpty()) {
+                $questions = $test->questions()->wherePivot('cadangan', false)->with('choices')->get();
+            }
+
+            if ($pakaiCadangan) {
+                $user->update(['cadangan_test_id' => null]); // sekali pakai
+            }
 
             if ($test->acak_soal) {
                 $questions = $questions->shuffle();

@@ -38,6 +38,15 @@ class LoginForm extends Form
             ]);
         }
 
+        // Tolak siswa yang diblokir karena pelanggaran.
+        if (Auth::user()->isBlocked()) {
+            Auth::logout();
+
+            throw ValidationException::withMessages([
+                'form.email' => 'Akun Anda diblokir karena pelanggaran saat ujian. Hubungi operator atau admin untuk membuka blokir.',
+            ]);
+        }
+
         RateLimiter::clear($this->throttleKey());
     }
 

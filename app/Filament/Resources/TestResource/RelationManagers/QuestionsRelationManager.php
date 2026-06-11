@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\TestResource\RelationManagers;
 
 use App\Filament\Resources\QuestionResource;
+use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
@@ -44,14 +45,34 @@ class QuestionsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('bobot')
                     ->label('Bobot')
                     ->state(fn ($record): int => $record->pivot->bobot ?? $record->bobot),
+                Tables\Columns\TextColumn::make('cadangan')
+                    ->label('Jenis')
+                    ->state(fn ($record): string => $record->pivot->cadangan ? 'Cadangan' : 'Utama')
+                    ->badge()
+                    ->color(fn (string $state): string => $state === 'Cadangan' ? 'warning' : 'success'),
+            ])
+            ->filters([
+                Tables\Filters\TernaryFilter::make('cadangan')
+                    ->label('Soal cadangan')
+                    ->queries(
+                        true: fn ($query) => $query->wherePivot('cadangan', true),
+                        false: fn ($query) => $query->wherePivot('cadangan', false),
+                        blank: fn ($query) => $query,
+                    ),
             ])
             ->headerActions([
-                // Tautkan soal yang sudah ada di bank.
+                // Tautkan soal yang sudah ada di bank (bisa ditandai cadangan).
                 Tables\Actions\AttachAction::make()
                     ->label('Tautkan dari Bank')
                     ->preloadRecordSelect()
                     ->multiple()
-                    ->recordSelectSearchColumns(['pertanyaan']),
+                    ->recordSelectSearchColumns(['pertanyaan'])
+                    ->form(fn (Tables\Actions\AttachAction $action): array => [
+                        $action->getRecordSelect(),
+                        Forms\Components\Toggle::make('cadangan')
+                            ->label('Tandai sebagai soal cadangan')
+                            ->default(false),
+                    ]),
                 // Buat soal baru sekaligus masuk ke bank dan tertaut ke ujian ini.
                 Tables\Actions\CreateAction::make()
                     ->label('Buat Soal Baru')
@@ -63,6 +84,12 @@ class QuestionsRelationManager extends RelationManager
                     }),
             ])
             ->actions([
+                Tables\Actions\Action::make('toggleCadangan')
+                    ->label(fn ($record): string => $record->pivot->cadangan ? 'Jadikan Utama' : 'Jadikan Cadangan')
+                    ->icon('heroicon-o-arrows-right-left')
+                    ->color('warning')
+                    ->action(fn ($record) => $this->getOwnerRecord()->questions()
+                        ->updateExistingPivot($record->id, ['cadangan' => ! $record->pivot->cadangan])),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DetachAction::make()
                     ->label('Lepas'),

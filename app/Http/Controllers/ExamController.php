@@ -16,18 +16,8 @@ class ExamController extends Controller
      */
     public function index()
     {
-        $tests = Test::query()
-            ->where('status', TestStatus::Published)
-            ->with('mataPelajaran')
-            ->withCount('questions')
-            ->latest()
-            ->get();
-
-        $attempts = TestAttempt::where('user_id', auth()->id())
-            ->get()
-            ->keyBy('test_id');
-
-        return view('exam.index', compact('tests', 'attempts'));
+        // Daftar ujian dirender oleh komponen Livewire (real-time auto-refresh).
+        return view('exam.index');
     }
 
     /**

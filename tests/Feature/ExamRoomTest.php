@@ -173,5 +173,45 @@ class ExamRoomTest extends TestCase
         $attempt->refresh();
         $this->assertSame(AttemptStatus::Selesai, $attempt->status);
         $this->assertSame(2, $attempt->pelanggaran);
+
+        // Capai ambang -> siswa diblokir login.
+        $this->assertTrue($siswa->fresh()->isBlocked());
+    }
+
+    public function test_retake_setelah_buka_blokir_pakai_soal_cadangan(): void
+    {
+        $siswa = User::create([
+            'name' => 'Siswa', 'email' => 's@t.test',
+            'password' => bcrypt('x'), 'role' => 'siswa',
+        ]);
+        $mapel = MataPelajaran::create(['nama' => 'MTK', 'kode' => 'MTK']);
+        $test = Test::create([
+            'mata_pelajaran_id' => $mapel->id, 'judul' => 'Ujian',
+            'durasi' => 30, 'kkm' => 70, 'status' => 'published', 'max_pelanggaran' => 1,
+        ]);
+
+        $main = Question::create(['mata_pelajaran_id' => $mapel->id, 'tipe' => 'pilihan_ganda', 'pertanyaan' => 'Utama', 'bobot' => 1, 'tingkat_kesulitan' => 'sedang']);
+        Choice::create(['question_id' => $main->id, 'label' => 'A', 'teks' => 'a', 'urutan' => 1, 'is_correct' => true]);
+        $test->questions()->attach($main->id, ['urutan' => 1, 'cadangan' => false]);
+
+        $cad = Question::create(['mata_pelajaran_id' => $mapel->id, 'tipe' => 'pilihan_ganda', 'pertanyaan' => 'Cadangan', 'bobot' => 1, 'tingkat_kesulitan' => 'sedang']);
+        Choice::create(['question_id' => $cad->id, 'label' => 'A', 'teks' => 'a', 'urutan' => 1, 'is_correct' => true]);
+        $test->questions()->attach($cad->id, ['urutan' => 1, 'cadangan' => true]);
+
+        $svc = app(ExamSessionService::class);
+
+        // Attempt pertama -> soal UTAMA.
+        $a1 = $svc->startOrResume($test, $siswa->id);
+        $this->assertSame([$main->id], $a1->attemptQuestions()->pluck('question_id')->all());
+
+        // Diblokir lalu dibuka -> attempt dihapus, ditandai pakai cadangan.
+        $siswa->blokir('pelanggaran', $test->id);
+        $siswa->bukaBlokir();
+        $this->assertSame($test->id, (int) $siswa->fresh()->cadangan_test_id);
+
+        // Attempt ulang -> soal CADANGAN.
+        $a2 = $svc->startOrResume($test, $siswa->id);
+        $this->assertSame([$cad->id], $a2->attemptQuestions()->pluck('question_id')->all());
+        $this->assertNull($siswa->fresh()->cadangan_test_id); // sekali pakai
     }
 }

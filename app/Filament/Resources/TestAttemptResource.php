@@ -87,6 +87,9 @@ class TestAttemptResource extends Resource
                     ->label('Ujian'),
                 Tables\Filters\SelectFilter::make('status')
                     ->options(AttemptStatus::class),
+                Tables\Filters\Filter::make('ada_pelanggaran')
+                    ->label('Hanya yang melanggar')
+                    ->query(fn (\Illuminate\Database\Eloquent\Builder $query) => $query->where('pelanggaran', '>', 0)),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
@@ -105,11 +108,18 @@ class TestAttemptResource extends Resource
         ];
     }
 
+    /**
+     * Attempt hanya dibuat oleh sistem saat siswa memulai ujian — bukan manual.
+     */
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
     public static function getPages(): array
     {
         return [
             'index' => Pages\ListTestAttempts::route('/'),
-            'create' => Pages\CreateTestAttempt::route('/create'),
             'edit' => Pages\EditTestAttempt::route('/{record}/edit'),
         ];
     }

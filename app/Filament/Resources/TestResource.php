@@ -11,6 +11,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Str;
 
 class TestResource extends Resource
 {
@@ -126,6 +127,29 @@ class TestResource extends Resource
                     ->options(TestStatus::class),
             ])
             ->actions([
+                Tables\Actions\Action::make('ubahToken')
+                    ->label('Ubah Token')
+                    ->icon('heroicon-o-key')
+                    ->color('warning')
+                    ->fillForm(fn (Test $record): array => ['token' => $record->token])
+                    ->form([
+                        Forms\Components\TextInput::make('token')
+                            ->label('Token Akses')
+                            ->maxLength(20)
+                            ->helperText('Kosongkan untuk menonaktifkan token. Klik ikon untuk membuat token acak.')
+                            ->suffixAction(
+                                Forms\Components\Actions\Action::make('generate')
+                                    ->icon('heroicon-m-arrow-path')
+                                    ->tooltip('Buat token acak')
+                                    ->action(fn (Forms\Set $set) => $set('token', Str::upper(Str::random(6)))),
+                            ),
+                    ])
+                    ->modalHeading('Ubah Token Ujian')
+                    ->modalSubmitActionLabel('Simpan Token')
+                    ->action(fn (Test $record, array $data) => $record->update([
+                        'token' => $data['token'] ?: null,
+                    ]))
+                    ->successNotificationTitle('Token ujian diperbarui'),
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([

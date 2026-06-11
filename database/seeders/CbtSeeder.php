@@ -121,6 +121,47 @@ class CbtSeeder extends Seeder
         ]);
         $ujian->questions()->attach($essay->id, ['urutan' => count($soal) + 1]);
 
-        $this->command->info('CBT seeder selesai: 3 user, 3 mata pelajaran, 1 ujian, 10 soal PG + 1 essay.');
+        // ---- 10 SOAL CADANGAN (dipakai saat ujian ulang setelah buka blokir) ----
+        $cadangan = [
+            ['Hasil dari 23 + 19 adalah ...', ['41', '42', '43', '32'], 1, '23 + 19 = 42.'],
+            ['Hasil dari 7 × 9 adalah ...', ['56', '63', '72', '64'], 1, '7 × 9 = 63.'],
+            ['Hasil dari 96 : 8 adalah ...', ['11', '12', '13', '14'], 1, '96 : 8 = 12.'],
+            ['Hasil dari 85 - 47 adalah ...', ['38', '42', '48', '32'], 0, '85 - 47 = 38.'],
+            ['Pecahan sederhana dari 9/12 adalah ...', ['2/3', '3/4', '4/5', '1/2'], 1, '9/12 dibagi 3 = 3/4.'],
+            ['Hasil dari 1/3 + 1/6 adalah ...', ['1/2', '2/9', '1/9', '2/3'], 0, '2/6 + 1/6 = 3/6 = 1/2.'],
+            ['Luas persegi dengan sisi 7 cm adalah ...', ['14 cm²', '28 cm²', '49 cm²', '21 cm²'], 2, '7 × 7 = 49 cm².'],
+            ['Keliling persegi panjang p=9 cm, l=4 cm adalah ...', ['26 cm', '36 cm', '13 cm', '22 cm'], 0, '2 × (9 + 4) = 26 cm.'],
+            ['Hasil dari 3² + 4² adalah ...', ['25', '12', '49', '7'], 0, '9 + 16 = 25.'],
+            ['Nilai 30% dari 150 adalah ...', ['30', '45', '50', '60'], 1, '0,3 × 150 = 45.'],
+        ];
+
+        foreach ($cadangan as $i => [$pertanyaan, $opsi, $benar, $pembahasan]) {
+            $question = Question::create([
+                'mata_pelajaran_id' => $matematika->id,
+                'created_by' => $admin->id,
+                'tipe' => 'pilihan_ganda',
+                'pertanyaan' => $pertanyaan,
+                'bobot' => 1,
+                'tingkat_kesulitan' => 'sedang',
+                'pembahasan' => $pembahasan,
+            ]);
+
+            foreach ($opsi as $j => $teks) {
+                $question->choices()->create([
+                    'label' => $labels[$j],
+                    'teks' => $teks,
+                    'urutan' => $j + 1,
+                    'is_correct' => $j === $benar,
+                ]);
+            }
+
+            // Tandai sebagai CADANGAN di pivot.
+            $ujian->questions()->attach($question->id, [
+                'urutan' => $i + 1,
+                'cadangan' => true,
+            ]);
+        }
+
+        $this->command->info('CBT seeder selesai: 1 ujian, 10 soal PG + 1 essay + 10 soal cadangan.');
     }
 }
