@@ -61,4 +61,29 @@ class Test extends Model
     {
         return $this->hasMany(TestAttempt::class);
     }
+
+    /**
+     * Ada siswa yang sedang mengerjakan ujian ini (belum selesai & waktu belum habis)?
+     */
+    public function hasActiveAttempts(): bool
+    {
+        return $this->attempts()->aktif()->exists();
+    }
+
+    public function activeAttemptsCount(): int
+    {
+        return $this->attempts()->aktif()->count();
+    }
+
+    protected static function booted(): void
+    {
+        // Pengaman: jangan biarkan ujian terhapus saat masih dikerjakan siswa.
+        static::deleting(function (Test $test) {
+            if ($test->hasActiveAttempts()) {
+                throw new \RuntimeException(
+                    'Ujian "'.$test->judul.'" tidak dapat dihapus karena masih ada siswa yang mengerjakan.'
+                );
+            }
+        });
+    }
 }

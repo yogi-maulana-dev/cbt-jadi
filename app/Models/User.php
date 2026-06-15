@@ -57,6 +57,22 @@ class User extends Authenticatable
         ];
     }
 
+    /**
+     * Mata pelajaran yang diajar guru ini (penugasan many-to-many).
+     */
+    public function mataPelajarans(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(MataPelajaran::class, 'guru_mata_pelajaran');
+    }
+
+    /**
+     * @return array<int, int> ID mapel yang diajar guru ini.
+     */
+    public function mataPelajaranIds(): array
+    {
+        return $this->mataPelajarans()->pluck('mata_pelajarans.id')->all();
+    }
+
     public function isBlocked(): bool
     {
         return (bool) $this->diblokir;

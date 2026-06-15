@@ -8,6 +8,7 @@ use App\Filament\Resources\TestResource\RelationManagers\QuestionsRelationManage
 use App\Models\Test;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -154,7 +155,20 @@ class TestResource extends Resource
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->before(function (\Illuminate\Support\Collection $records, Tables\Actions\DeleteBulkAction $action) {
+                            $aktif = $records->filter->hasActiveAttempts();
+                            if ($aktif->isNotEmpty()) {
+                                Notification::make()
+                                    ->title('Sebagian ujian tidak bisa dihapus')
+                                    ->body('Ujian "'.$aktif->pluck('judul')->implode('", "').'" masih dikerjakan siswa. Tutup ujian (Closed) lalu keluarkan/biarkan siswa selesai dulu.')
+                                    ->danger()
+                                    ->persistent()
+                                    ->send();
+
+                                $action->halt();
+                            }
+                        }),
                 ]),
             ]);
     }

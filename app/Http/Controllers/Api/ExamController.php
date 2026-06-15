@@ -234,6 +234,7 @@ class ExamController extends Controller
                 'tipe' => $q->tipe->value,
                 'pertanyaan' => $q->pertanyaan,
                 'gambar' => $q->gambar,
+                'video_url' => $q->video_url,
                 'choices' => $q->tipe === QuestionType::Essay ? [] : $choices,
                 'choice_id' => $answer?->choice_id,
                 'jawaban_essay' => $answer?->jawaban_essay,

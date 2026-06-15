@@ -29,11 +29,28 @@ class MataPelajaranResource extends Resource
     {
         return $form
             ->schema([
+                Forms\Components\Select::make('jurusan_id')
+                    ->label('Jurusan')
+                    ->relationship('jurusan', 'nama')
+                    ->searchable()
+                    ->preload()
+                    ->createOptionForm([
+                        Forms\Components\TextInput::make('nama')->required(),
+                        Forms\Components\TextInput::make('kode'),
+                    ]),
                 Forms\Components\TextInput::make('nama')
                     ->required()
                     ->maxLength(255),
                 Forms\Components\TextInput::make('kode')
                     ->maxLength(255),
+                Forms\Components\Select::make('gurus')
+                    ->label('Guru pengampu')
+                    ->relationship('gurus', 'name', fn (Builder $query) => $query->where('role', 'operator'))
+                    ->multiple()
+                    ->preload()
+                    ->searchable()
+                    ->helperText('Guru yang ditugaskan mengajar mapel ini (menentukan Bank Soal yang bisa diakses guru).')
+                    ->columnSpanFull(),
                 Forms\Components\Textarea::make('deskripsi')
                     ->columnSpanFull(),
             ]);
@@ -43,10 +60,19 @@ class MataPelajaranResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('jurusan.nama')
+                    ->label('Jurusan')
+                    ->badge()
+                    ->placeholder('—')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('nama')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('kode')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('gurus.name')
+                    ->label('Guru pengampu')
+                    ->badge()
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

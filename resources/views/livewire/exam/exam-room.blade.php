@@ -50,8 +50,20 @@
             </div>
 
             @if ($q->gambar)
-                <img src="{{ Storage::url($q->gambar) }}" alt="Gambar soal"
+                <img src="{{ Storage::disk('public')->url($q->gambar) }}" alt="Gambar soal"
                      class="max-h-64 rounded-lg border mb-4">
+            @endif
+
+            @if ($q->video_is_file)
+                <video controls preload="metadata" class="max-h-64 rounded-lg border mb-4">
+                    <source src="{{ $q->video_src }}">
+                    Browser Anda tidak mendukung pemutar video.
+                </video>
+            @elseif ($q->video_url)
+                <a href="{{ $q->video_url }}" target="_blank" rel="noopener"
+                   class="mb-4 inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100">
+                    ▶ Tonton video pendukung soal
+                </a>
             @endif
 
             @if ($this->isEssay)
@@ -80,7 +92,7 @@
                                 <span class="pt-0.5">
                                     {{ $c->teks }}
                                     @if ($c->gambar)
-                                        <img src="{{ Storage::url($c->gambar) }}" class="mt-2 max-h-32 rounded border">
+                                        <img src="{{ Storage::disk('public')->url($c->gambar) }}" class="mt-2 max-h-32 rounded border">
                                     @endif
                                 </span>
                             </button>

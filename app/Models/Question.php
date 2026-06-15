@@ -16,9 +16,13 @@ class Question extends Model
     protected $fillable = [
         'mata_pelajaran_id',
         'created_by',
+        'import_batch',
         'tipe',
         'pertanyaan',
         'gambar',
+        'video_url',
+        'video_path',
+        'media_pending',
         'bobot',
         'tingkat_kesulitan',
         'pembahasan',
@@ -26,7 +30,29 @@ class Question extends Model
 
     protected $casts = [
         'tipe' => QuestionType::class,
+        'media_pending' => 'boolean',
     ];
+
+    /**
+     * URL video soal: file upload (video_path) diutamakan, lalu URL eksternal.
+     */
+    public function getVideoSrcAttribute(): ?string
+    {
+        if ($this->video_path) {
+            return \Illuminate\Support\Facades\Storage::disk('public')->url($this->video_path);
+        }
+
+        return $this->video_url ?: null;
+    }
+
+    /**
+     * True bila video berupa file yang diupload (diputar dengan <video>),
+     * false bila berupa URL eksternal (dibuka sebagai tautan).
+     */
+    public function getVideoIsFileAttribute(): bool
+    {
+        return (bool) $this->video_path;
+    }
 
     public function mataPelajaran(): BelongsTo
     {
@@ -64,5 +90,27 @@ class Question extends Model
     public function answers(): HasMany
     {
         return $this->hasMany(UserAnswer::class);
+    }
+
+    /**
+     * Soal ini sedang dipakai pada ujian yang aktif dikerjakan siswa?
+     */
+    public function inActiveExam(): bool
+    {
+        return $this->tests()
+            ->whereHas('attempts', fn (\Illuminate\Database\Eloquent\Builder $q) => $q->aktif())
+            ->exists();
+    }
+
+    protected static function booted(): void
+    {
+        // Pengaman: jangan hapus soal yang sedang dipakai ujian aktif.
+        static::deleting(function (Question $question) {
+            if ($question->inActiveExam()) {
+                throw new \RuntimeException(
+                    'Soal ini tidak dapat dihapus karena sedang dipakai pada ujian yang aktif dikerjakan siswa.'
+                );
+            }
+        });
     }
 }

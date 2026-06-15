@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AttemptStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -59,5 +60,17 @@ class TestAttempt extends Model
     public function isExpired(): bool
     {
         return $this->deadline !== null && now()->greaterThanOrEqualTo($this->deadline);
+    }
+
+    /**
+     * Attempt yang BENAR-BENAR sedang dikerjakan: status sedang dikerjakan
+     * dan waktunya belum habis (deadline belum lewat).
+     */
+    public function scopeAktif(Builder $query): void
+    {
+        $query->where('status', AttemptStatus::SedangDikerjakan)
+            ->where(function (Builder $q) {
+                $q->whereNull('deadline')->orWhere('deadline', '>', now());
+            });
     }
 }
