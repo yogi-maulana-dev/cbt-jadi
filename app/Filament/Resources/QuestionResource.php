@@ -109,6 +109,13 @@ class QuestionResource extends Resource
                         ->maxSize(51200)
                         ->helperText('Seret file video ke sini. Maks 50 MB. Format mp4 paling disarankan.')
                         ->columnSpanFull(),
+                    Forms\Components\FileUpload::make('suara')
+                        ->label('Suara / audio (opsional)')
+                        ->directory('soal-audio')
+                        ->acceptedFileTypes(['audio/mpeg', 'audio/mp3', 'audio/ogg', 'audio/wav', 'audio/x-wav', 'audio/aac', 'audio/mp4', 'audio/x-m4a'])
+                        ->maxSize(20480)
+                        ->helperText('Seret file audio (mp3/ogg/wav) ke sini. Maks 20 MB. Berguna untuk soal listening.')
+                        ->columnSpanFull(),
                     Forms\Components\Toggle::make('media_pending')
                         ->label('Tandai: soal ini wajib bergambar/video tetapi belum lengkap')
                         ->helperText('Bila aktif, ujian yang memuat soal ini tidak bisa dipublish sampai medianya dilengkapi. Otomatis nonaktif begitu gambar/video diisi.')
@@ -304,7 +311,8 @@ class QuestionResource extends Resource
                         $report = app(BankSoalImport::class)->import($file->getRealPath(), $user?->id, $allowed);
 
                         $dup = $report['duplicates'] ?? 0;
-                        $body = "Berhasil impor {$report['imported']} soal — gambar {$report['with_image']}, video {$report['with_video']}, duplikat dilewati {$dup}.";
+                        $aud = $report['with_audio'] ?? 0;
+                        $body = "Berhasil impor {$report['imported']} soal — gambar {$report['with_image']}, video {$report['with_video']}, suara {$aud}, duplikat dilewati {$dup}.";
 
                         $notif = Notification::make()->title('Import selesai')->persistent();
 

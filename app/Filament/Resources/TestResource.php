@@ -151,6 +151,28 @@ class TestResource extends Resource
                         'token' => $data['token'] ?: null,
                     ]))
                     ->successNotificationTitle('Token ujian diperbarui'),
+                Tables\Actions\Action::make('keluarkanPeserta')
+                    ->label('Keluarkan Peserta')
+                    ->icon('heroicon-o-arrow-right-on-rectangle')
+                    ->color('danger')
+                    ->visible(fn (Test $record): bool => $record->attempts()
+                        ->where('status', \App\Enums\AttemptStatus::SedangDikerjakan)->exists())
+                    ->requiresConfirmation()
+                    ->modalHeading('Keluarkan SEMUA peserta yang sedang mengerjakan?')
+                    ->modalDescription('Semua peserta yang sedang mengerjakan ujian ini akan dikeluarkan & sesinya direset. Hasil peserta yang sudah SELESAI tidak terhapus. Setelah soal diperbaiki, mereka bisa mulai lagi.')
+                    ->modalSubmitActionLabel('Ya, keluarkan semua')
+                    ->action(function (Test $record) {
+                        $belumSelesai = $record->attempts()
+                            ->where('status', \App\Enums\AttemptStatus::SedangDikerjakan);
+                        $jumlah = $belumSelesai->count();
+                        $belumSelesai->delete(); // cascade: jawaban & snapshot ikut terhapus
+
+                        Notification::make()
+                            ->title('Peserta dikeluarkan')
+                            ->body("{$jumlah} peserta yang sedang mengerjakan direset. Mereka dapat mulai ujian lagi setelah soal diperbaiki.")
+                            ->success()
+                            ->send();
+                    }),
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([

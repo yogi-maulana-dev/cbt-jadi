@@ -151,4 +151,86 @@ class ExamApiTest extends TestCase
 
         $this->getJson("/api/attempts/{$attemptId}/result")->assertStatus(403);
     }
+
+    public function test_snapshot_mengirim_url_penuh_gambar(): void
+    {
+        $siswa = User::create([
+            'name' => 'Siswa', 'email' => 'img@api.test',
+            'password' => bcrypt('password'), 'role' => 'siswa',
+        ]);
+        $mapel = MataPelajaran::create(['nama' => 'MTK', 'kode' => 'MTK']);
+        $test = Test::create([
+            'mata_pelajaran_id' => $mapel->id, 'judul' => 'UH IMG',
+            'durasi' => 30, 'kkm' => 70, 'status' => 'published',
+        ]);
+        $q = Question::create([
+            'mata_pelajaran_id' => $mapel->id, 'tipe' => 'pilihan_ganda',
+            'pertanyaan' => 'Lihat gambar', 'bobot' => 1, 'tingkat_kesulitan' => 'sedang',
+            'gambar' => 'soal/contoh.png',
+        ]);
+        Choice::create(['question_id' => $q->id, 'label' => 'A', 'teks' => 'a', 'urutan' => 1, 'is_correct' => true]);
+        $test->questions()->attach($q->id, ['urutan' => 1]);
+
+        Sanctum::actingAs($siswa);
+        $gambar = $this->postJson("/api/exams/{$test->id}/start", [])->json('questions.0.gambar');
+
+        $this->assertNotNull($gambar);
+        $this->assertStringContainsString('/storage/soal/contoh.png', $gambar);
+    }
+
+    public function test_snapshot_mengirim_url_suara(): void
+    {
+        $siswa = User::create([
+            'name' => 'Siswa', 'email' => 'aud@api.test',
+            'password' => bcrypt('password'), 'role' => 'siswa',
+        ]);
+        $mapel = MataPelajaran::create(['nama' => 'BIG', 'kode' => 'BIG']);
+        $test = Test::create([
+            'mata_pelajaran_id' => $mapel->id, 'judul' => 'Listening',
+            'durasi' => 30, 'kkm' => 70, 'status' => 'published',
+        ]);
+        $q = Question::create([
+            'mata_pelajaran_id' => $mapel->id, 'tipe' => 'pilihan_ganda',
+            'pertanyaan' => 'Dengarkan', 'bobot' => 1, 'tingkat_kesulitan' => 'sedang',
+            'suara' => 'soal-audio/listening.mp3',
+        ]);
+        Choice::create(['question_id' => $q->id, 'label' => 'A', 'teks' => 'a', 'urutan' => 1, 'is_correct' => true]);
+        $test->questions()->attach($q->id, ['urutan' => 1]);
+
+        Sanctum::actingAs($siswa);
+        $suara = $this->postJson("/api/exams/{$test->id}/start", [])->json('questions.0.suara');
+
+        $this->assertNotNull($suara);
+        $this->assertStringContainsString('/storage/soal-audio/listening.mp3', $suara);
+    }
+
+    public function test_heartbeat_mengembalikan_status_aktif(): void
+    {
+        [$siswa, $test] = $this->buildExam();
+        Sanctum::actingAs($siswa);
+        $attemptId = $this->postJson("/api/exams/{$test->id}/start", [])->json('attempt_id');
+
+        $this->getJson("/api/attempts/{$attemptId}/heartbeat")
+            ->assertOk()
+            ->assertJson(['reset' => false, 'active' => true, 'finished' => false]);
+    }
+
+    public function test_attempt_direset_balas_410_dengan_flag_reset(): void
+    {
+        [$siswa, $test] = $this->buildExam();
+        Sanctum::actingAs($siswa);
+        $attemptId = $this->postJson("/api/exams/{$test->id}/start", [])->json('attempt_id');
+
+        // Pengawas mengeluarkan & mereset peserta (attempt dihapus).
+        \App\Models\TestAttempt::findOrFail($attemptId)->delete();
+
+        // Heartbeat & aksi lain harus balas 410 + reset:true (bukan 404/500).
+        $this->getJson("/api/attempts/{$attemptId}/heartbeat")
+            ->assertStatus(410)
+            ->assertJson(['reset' => true]);
+
+        $this->postJson("/api/attempts/{$attemptId}/answer", ['question_id' => 1])
+            ->assertStatus(410)
+            ->assertJson(['reset' => true]);
+    }
 }

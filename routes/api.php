@@ -24,9 +24,23 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/exams', [ExamController::class, 'index']);
     Route::post('/exams/{test}/start', [ExamController::class, 'start']);
 
-    Route::post('/attempts/{attempt}/answer', [ExamController::class, 'answer']);
-    Route::post('/attempts/{attempt}/flag', [ExamController::class, 'flag']);
-    Route::post('/attempts/{attempt}/violation', [ExamController::class, 'violation']);
-    Route::post('/attempts/{attempt}/finish', [ExamController::class, 'finish']);
-    Route::get('/attempts/{attempt}/result', [ExamController::class, 'result']);
+    // Bila attempt sudah direset/dikeluarkan pengawas, attempt tidak ditemukan ->
+    // balas 410 Gone + flag "reset" agar aplikasi Android keluar dengan pesan jelas
+    // (bukan crash/404 ambigu). Aman koneksi: hanya muncul saat server benar-benar
+    // tak menemukan attempt, jadi gangguan jaringan tidak akan menendang siswa.
+    $attemptReset = fn () => response()->json([
+        'reset' => true,
+        'title' => \App\Models\Setting::kickTitle(),
+        'message' => \App\Models\Setting::kickMessage(),
+    ], 410);
+
+    Route::post('/attempts/{attempt}/answer', [ExamController::class, 'answer'])->missing($attemptReset);
+    Route::post('/attempts/{attempt}/flag', [ExamController::class, 'flag'])->missing($attemptReset);
+    Route::post('/attempts/{attempt}/violation', [ExamController::class, 'violation'])->missing($attemptReset);
+    Route::post('/attempts/{attempt}/finish', [ExamController::class, 'finish'])->missing($attemptReset);
+    Route::get('/attempts/{attempt}/result', [ExamController::class, 'result'])->missing($attemptReset);
+
+    // Heartbeat: di-poll aplikasi tiap ~10-15 detik untuk mendeteksi reset/selesai
+    // secara real-time. attempt hilang -> 410 (reset); selesai/expired -> field di bawah.
+    Route::get('/attempts/{attempt}/heartbeat', [ExamController::class, 'heartbeat'])->missing($attemptReset);
 });

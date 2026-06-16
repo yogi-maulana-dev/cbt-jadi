@@ -40,7 +40,7 @@ class LengkapiMedia extends Page implements HasForms
 
         $items = Question::where('import_batch', $batch)
             ->orderBy('id')
-            ->get(['id', 'pertanyaan', 'gambar', 'video_url', 'video_path', 'media_pending'])
+            ->get(['id', 'pertanyaan', 'gambar', 'video_url', 'video_path', 'suara', 'media_pending'])
             ->values()
             ->map(fn (Question $q, int $i): array => [
                 'id' => $q->id,
@@ -49,6 +49,7 @@ class LengkapiMedia extends Page implements HasForms
                 'gambar' => $q->gambar,
                 'video_url' => $q->video_url,
                 'video_path' => $q->video_path,
+                'suara' => $q->suara,
                 'media_pending' => $q->media_pending,
             ])->all();
 
@@ -65,7 +66,8 @@ class LengkapiMedia extends Page implements HasForms
                     ->deletable(false)
                     ->reorderable(false)
                     ->itemLabel(function (array $state): string {
-                        $hasMedia = filled($state['gambar'] ?? null) || filled($state['video_path'] ?? null) || filled($state['video_url'] ?? null);
+                        $hasMedia = filled($state['gambar'] ?? null) || filled($state['video_path'] ?? null)
+                            || filled($state['video_url'] ?? null) || filled($state['suara'] ?? null);
                         $perluMedia = ($state['media_pending'] ?? false) && ! $hasMedia;
 
                         return ($perluMedia ? '⚠ BELUM ADA MEDIA — ' : '✓ ')
@@ -76,7 +78,8 @@ class LengkapiMedia extends Page implements HasForms
                         Forms\Components\Placeholder::make('teks')
                             ->hiddenLabel()
                             ->content(function (Forms\Get $get): HtmlString {
-                                $hasMedia = filled($get('gambar')) || filled($get('video_path')) || filled($get('video_url'));
+                                $hasMedia = filled($get('gambar')) || filled($get('video_path'))
+                                    || filled($get('video_url')) || filled($get('suara'));
                                 $perluMedia = $get('media_pending') && ! $hasMedia;
                                 $no = e((string) $get('no'));
                                 $teks = e((string) $get('pertanyaan'));
@@ -117,6 +120,15 @@ class LengkapiMedia extends Page implements HasForms
                             ->helperText('Tersimpan otomatis. Isi salah satu saja: file video ATAU URL.')
                             ->live(onBlur: true)
                             ->afterStateUpdated(fn (?string $state, Forms\Get $get) => $this->persistRow($get('id'), ['video_url' => $state ?: null])),
+                        Forms\Components\FileUpload::make('suara')
+                            ->label('Suara / audio — seret file ke sini')
+                            ->directory('soal-audio')
+                            ->acceptedFileTypes(['audio/mpeg', 'audio/mp3', 'audio/ogg', 'audio/wav', 'audio/x-wav', 'audio/aac', 'audio/mp4', 'audio/x-m4a'])
+                            ->maxSize(20480)
+                            ->helperText('Tersimpan otomatis. mp3/ogg/wav, maks 20 MB (untuk soal listening).')
+                            ->columnSpanFull()
+                            ->live()
+                            ->afterStateUpdated(fn (Forms\Components\FileUpload $component, Forms\Get $get) => $this->persistUpload($get('id'), 'suara', $component)),
                         Forms\Components\Hidden::make('id'),
                         Forms\Components\Hidden::make('no'),
                         Forms\Components\Hidden::make('pertanyaan'),
@@ -157,7 +169,7 @@ class LengkapiMedia extends Page implements HasForms
         }
 
         $q->fill($attrs);
-        if ($q->gambar || $q->video_path || $q->video_url) {
+        if ($q->gambar || $q->video_path || $q->video_url || $q->suara) {
             $q->media_pending = false;
         }
         $q->save();
@@ -173,6 +185,7 @@ class LengkapiMedia extends Page implements HasForms
                 'gambar' => $item['gambar'] ?: null,
                 'video_path' => $item['video_path'] ?: null,
                 'video_url' => $item['video_url'] ?: null,
+                'suara' => $item['suara'] ?: null,
             ]);
             $count++;
         }

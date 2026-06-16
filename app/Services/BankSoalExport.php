@@ -47,16 +47,17 @@ class BankSoalExport
         // Layout SAMA dengan template import -> hasil export bisa diedit & di-import ulang.
         $sheet->fromArray(BankSoalImport::HEADERS, null, 'A1');
 
-        $sheet->getStyle('A1:N1')->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
-        $sheet->getStyle('A1:N1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('4F46E5');
-        $sheet->getStyle('A1:N1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('A1:O1')->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
+        $sheet->getStyle('A1:O1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('4F46E5');
+        $sheet->getStyle('A1:O1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        foreach (range('A', 'N') as $col) {
+        foreach (range('A', 'O') as $col) {
             $sheet->getColumnDimension($col)->setWidth(15);
         }
         $sheet->getColumnDimension('E')->setWidth(42); // Pertanyaan
         $sheet->getColumnDimension('F')->setWidth(20); // Gambar
         $sheet->getColumnDimension('N')->setWidth(28); // Pembahasan
+        $sheet->getColumnDimension('O')->setWidth(22); // Suara
 
         $optCols = ['H', 'I', 'J', 'K', 'L'];
 
@@ -81,6 +82,7 @@ class BankSoalExport
             }
             $sheet->setCellValue("M{$row}", $benar);
             $sheet->setCellValue("N{$row}", $q->pembahasan ?? '');
+            $sheet->setCellValue("O{$row}", $q->suara ? basename($q->suara) : '');
 
             // Gambar ditanam langsung di sel (kolom F) -> ikut saat di-import lagi.
             $img = $this->imagePath($q->gambar);
@@ -95,13 +97,13 @@ class BankSoalExport
                 $sheet->getRowDimension($row)->setRowHeight(66);
             }
 
-            $sheet->getStyle("A{$row}:N{$row}")->getAlignment()
+            $sheet->getStyle("A{$row}:O{$row}")->getAlignment()
                 ->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
 
             $row++;
         }
 
-        $sheet->getStyle('A1:N'.($row - 1))->getBorders()->getAllBorders()
+        $sheet->getStyle('A1:O'.($row - 1))->getBorders()->getAllBorders()
             ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
 
         $writer = new Xlsx($ss);

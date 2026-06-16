@@ -86,6 +86,15 @@ class User extends Authenticatable
             'alasan_blokir' => $alasan,
             'diblokir_test_id' => $testId,
         ]);
+
+        // Catat riwayat insiden (terbuka; ditutup saat buka blokir) untuk evaluasi.
+        PelanggaranLog::create([
+            'user_id' => $this->id,
+            'test_id' => $testId,
+            'test_judul' => $testId ? optional(Test::find($testId))->judul : null,
+            'alasan' => $alasan,
+            'diblokir_pada' => now(),
+        ]);
     }
 
     /**
@@ -95,6 +104,22 @@ class User extends Authenticatable
     public function bukaBlokir(): void
     {
         $testId = $this->diblokir_test_id;
+
+        // Tutup riwayat insiden yang masih terbuka (atau buat bila tak ada — blokir lama).
+        $log = PelanggaranLog::where('user_id', $this->id)->whereNull('dibuka_pada')->latest('id')->first();
+        if ($log) {
+            $log->update(['dibuka_pada' => now(), 'dibuka_oleh' => auth()->id()]);
+        } else {
+            PelanggaranLog::create([
+                'user_id' => $this->id,
+                'test_id' => $testId,
+                'test_judul' => $testId ? optional(Test::find($testId))->judul : null,
+                'alasan' => $this->alasan_blokir,
+                'diblokir_pada' => $this->diblokir_pada,
+                'dibuka_pada' => now(),
+                'dibuka_oleh' => auth()->id(),
+            ]);
+        }
 
         if ($testId) {
             $this->attempts()->where('test_id', $testId)->delete();

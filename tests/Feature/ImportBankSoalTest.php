@@ -114,6 +114,32 @@ class ImportBankSoalTest extends TestCase
         $this->assertTrue($q2->choices()->where('teks', 'Benar')->first()->is_correct);
     }
 
+    public function test_import_audio_dari_nama_file_dan_pending_bila_hilang(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('soal-audio/listening.mp3', 'dummy-audio');
+        MataPelajaran::create(['nama' => 'Bahasa Inggris', 'kode' => 'BIG']);
+
+        // Kolom ke-15 = Suara (nama file).
+        $path = $this->buatFileExcel([
+            ['BIG', 'pilihan_ganda', 'sedang', 1, 'Dengarkan audio', '', '', 'a', 'b', '', '', '', 'A', '', 'listening.mp3'],
+            ['BIG', 'pilihan_ganda', 'sedang', 1, 'Audio hilang', '', '', 'a', 'b', '', '', '', 'A', '', 'tidak-ada.mp3'],
+        ]);
+
+        $report = app(BankSoalImport::class)->import($path, null, null);
+        @unlink($path);
+
+        $this->assertSame(1, $report['with_audio']);
+
+        $q1 = Question::where('pertanyaan', 'Dengarkan audio')->first();
+        $this->assertSame('soal-audio/listening.mp3', $q1->suara);
+        $this->assertFalse($q1->media_pending);
+
+        $q2 = Question::where('pertanyaan', 'Audio hilang')->first();
+        $this->assertNull($q2->suara);
+        $this->assertTrue($q2->media_pending); // dideklarasikan tapi file tak ada
+    }
+
     public function test_operator_hanya_bisa_impor_mapel_yang_diampu(): void
     {
         $mtk = MataPelajaran::create(['nama' => 'Matematika', 'kode' => 'MTK']);

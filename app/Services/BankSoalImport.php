@@ -21,6 +21,7 @@ class BankSoalImport
         'Gambar', 'Video (URL)',
         'Opsi A', 'Opsi B', 'Opsi C', 'Opsi D', 'Opsi E',
         'Jawaban Benar', 'Pembahasan',
+        'Suara (nama file)',
     ];
 
     // ----------------------- TEMPLATE -----------------------
@@ -32,10 +33,10 @@ class BankSoalImport
         $sheet = $ss->getActiveSheet();
         $sheet->setTitle('Soal');
         $sheet->fromArray(self::HEADERS, null, 'A1');
-        $sheet->getStyle('A1:N1')->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
-        $sheet->getStyle('A1:N1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('4F46E5');
+        $sheet->getStyle('A1:O1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('4F46E5');
+        $sheet->getStyle('A1:O1')->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
 
-        foreach (range('A', 'N') as $col) {
+        foreach (range('A', 'O') as $col) {
             $sheet->getColumnDimension($col)->setWidth(16);
         }
         $sheet->getColumnDimension('E')->setWidth(40);
@@ -72,6 +73,9 @@ class BankSoalImport
             '                     Kosongkan semua untuk soal essay.',
             '9.  Jawaban Benar : huruf opsi yang benar (A/B/C/D/E) — wajib untuk pilihan_ganda.',
             '10. Pembahasan    : penjelasan jawaban (opsional).',
+            '11. Suara (nama file): >>> ISI HANYA BILA SOAL ADA AUDIO/SUARA <<<',
+            '                     tulis NAMA FILE audio yang sudah diunggah (mis. listening1.mp3).',
+            '                     Atau kosongkan & unggah lewat menu "Lengkapi Media" setelah import.',
             '',
             'CATATAN PENTING (agar tidak ada yang terlewat / slip):',
             '- Saat import, sistem MEMBERI PERINGATAN bila: gambar tidak ditemukan filenya,',
@@ -100,7 +104,7 @@ class BankSoalImport
 
     /**
      * @param  array<int,int>|null  $allowedMapelIds  null = admin (semua mapel)
-     * @return array{imported:int, with_image:int, with_video:int, duplicates:int, batch:?string, warnings:array<int,string>}
+     * @return array{imported:int, with_image:int, with_video:int, with_audio:int, duplicates:int, batch:?string, warnings:array<int,string>}
      */
     public function import(string $filePath, ?int $createdBy, ?array $allowedMapelIds): array
     {
@@ -123,6 +127,7 @@ class BankSoalImport
         $imported = 0;
         $withImage = 0;
         $withVideo = 0;
+        $withAudio = 0;
         $duplicates = 0;
         $warnings = [];
 
@@ -136,8 +141,8 @@ class BankSoalImport
             if ($idx === 0) {
                 continue; // header
             }
-            $r = array_pad($r, 14, null);
-            [$kode, $tipe, $kesulitan, $bobot, $pertanyaan, $gambar, $video, $a, $b, $c, $d, $e, $benar, $pembahasan] = $r;
+            $r = array_pad($r, 15, null);
+            [$kode, $tipe, $kesulitan, $bobot, $pertanyaan, $gambar, $video, $a, $b, $c, $d, $e, $benar, $pembahasan, $suara] = $r;
             $no = $idx + 1;
 
             if (blank($kode) && blank($pertanyaan)) {
@@ -187,9 +192,10 @@ class BankSoalImport
             }
             $signatures[$mapelId][$sig] = true;
 
-            // Apakah baris ini MENDEKLARASIKAN media (kolom Gambar/Video diisi / gambar tertanam)?
+            // Apakah baris ini MENDEKLARASIKAN media (kolom Gambar/Video/Suara diisi / gambar tertanam)?
             $declaredImage = isset($embedded[$no]) || filled($gambar);
             $declaredVideo = filled($video);
+            $declaredAudio = filled($suara);
 
             $gambarPath = null;
             if (isset($embedded[$no])) {
@@ -221,8 +227,23 @@ class BankSoalImport
                 }
             }
 
+            // Suara/audio: dideklarasikan dengan NAMA FILE yang sudah diunggah ke soal-audio/.
+            $suaraPath = null;
+            if ($declaredAudio) {
+                $fname = basename(trim((string) $suara));
+                $rel = 'soal-audio/'.$fname;
+                if (Storage::disk('public')->exists($rel)) {
+                    $suaraPath = $rel;
+                    $withAudio++;
+                } else {
+                    $warnings[] = "Baris {$no} ({$mapelLabel}): suara '{$fname}' tidak ditemukan — soal dibuat tanpa suara.";
+                }
+            }
+
             // Soal menyatakan butuh media tapi belum berhasil dilampirkan -> tandai perlu dilengkapi.
-            $mediaPending = ($declaredImage && $gambarPath === null) || ($declaredVideo && ! $gotVideo);
+            $mediaPending = ($declaredImage && $gambarPath === null)
+                || ($declaredVideo && ! $gotVideo)
+                || ($declaredAudio && $suaraPath === null);
 
             $question = Question::create([
                 'mata_pelajaran_id' => $mapelId,
@@ -232,6 +253,7 @@ class BankSoalImport
                 'pertanyaan' => trim((string) $pertanyaan),
                 'gambar' => $gambarPath,
                 'video_url' => filled($video) ? trim((string) $video) : null,
+                'suara' => $suaraPath,
                 'media_pending' => $mediaPending,
                 'bobot' => (int) ($bobot ?: 1),
                 'tingkat_kesulitan' => $kesulitan,
@@ -268,6 +290,7 @@ class BankSoalImport
             'imported' => $imported,
             'with_image' => $withImage,
             'with_video' => $withVideo,
+            'with_audio' => $withAudio,
             'duplicates' => $duplicates,
             'batch' => $imported > 0 ? $batch : null,
             'warnings' => $warnings,

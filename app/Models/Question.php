@@ -22,6 +22,7 @@ class Question extends Model
         'gambar',
         'video_url',
         'video_path',
+        'suara',
         'media_pending',
         'bobot',
         'tingkat_kesulitan',
@@ -52,6 +53,31 @@ class Question extends Model
     public function getVideoIsFileAttribute(): bool
     {
         return (bool) $this->video_path;
+    }
+
+    /** URL file suara/audio soal, atau null. */
+    public function getSuaraSrcAttribute(): ?string
+    {
+        return $this->suara
+            ? \Illuminate\Support\Facades\Storage::disk('public')->url($this->suara)
+            : null;
+    }
+
+    /**
+     * URL embed YouTube (agar bisa ditanam inline, tidak membuka tab baru),
+     * atau null bila bukan YouTube / video berupa file.
+     */
+    public function getYoutubeEmbedAttribute(): ?string
+    {
+        if ($this->video_path || ! $this->video_url) {
+            return null;
+        }
+
+        if (preg_match('#(?:youtu\.be/|youtube\.com/(?:watch\?v=|embed/|shorts/|v/))([A-Za-z0-9_-]{11})#', $this->video_url, $m)) {
+            return 'https://www.youtube.com/embed/'.$m[1];
+        }
+
+        return null;
     }
 
     public function mataPelajaran(): BelongsTo

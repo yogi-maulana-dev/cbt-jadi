@@ -54,11 +54,23 @@
                      class="max-h-64 rounded-lg border mb-4">
             @endif
 
+            @if ($q->suara_src)
+                <audio controls preload="metadata" src="{{ $q->suara_src }}" class="mb-4 w-full max-w-md">
+                    Browser Anda tidak mendukung pemutar audio.
+                </audio>
+            @endif
+
             @if ($q->video_is_file)
                 <video controls preload="metadata" class="max-h-64 rounded-lg border mb-4">
                     <source src="{{ $q->video_src }}">
                     Browser Anda tidak mendukung pemutar video.
                 </video>
+            @elseif ($q->youtube_embed)
+                {{-- Ditanam inline agar siswa tidak pindah tab (mencegah pelanggaran). --}}
+                <div class="mb-4 aspect-video w-full max-w-xl overflow-hidden rounded-lg border">
+                    <iframe src="{{ $q->youtube_embed }}" class="h-full w-full"
+                            frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+                </div>
             @elseif ($q->video_url)
                 <a href="{{ $q->video_url }}" target="_blank" rel="noopener"
                    class="mb-4 inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100">
@@ -159,13 +171,16 @@
 
     {{--
         Timer berbasis epoch deadline server (kebal drift/tab-sleep) +
-        deteksi keluar tab (anti-cheat) bila max_pelanggaran > 0.
+        deteksi keluar tab (anti-cheat) bila max_pelanggaran > 0 +
+        heartbeat 10 detik: bila ujian direset pengawas, siswa diarahkan ke
+        halaman pemberitahuan. Dipicu via Alpine (andal, tak bergantung wire:poll).
     --}}
     <script>
         function examRoom(deadlineTs, maxPelanggaran) {
             return {
                 left: 0,
                 timer: null,
+                hb: null,
                 tick() {
                     this.left = Math.max(0, deadlineTs - Math.floor(Date.now() / 1000));
                     if (this.left <= 0) {
@@ -182,6 +197,9 @@
                 init() {
                     this.tick();
                     this.timer = setInterval(() => this.tick(), 1000);
+
+                    // Heartbeat: cek tiap 10 detik apakah ujian direset pengawas.
+                    this.hb = setInterval(() => { @this.heartbeat(); }, 10000);
 
                     if (maxPelanggaran > 0) {
                         document.addEventListener('visibilitychange', () => {

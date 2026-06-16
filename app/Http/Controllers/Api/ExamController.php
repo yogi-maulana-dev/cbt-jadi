@@ -144,6 +144,25 @@ class ExamController extends Controller
     }
 
     /**
+     * Denyut nadi untuk aplikasi: dipanggil berkala agar siswa keluar real-time
+     * saat ujian direset/selesai. Bila attempt sudah dihapus (dikeluarkan pengawas),
+     * route mengembalikan 410 + {reset:true} sebelum sampai ke sini.
+     */
+    public function heartbeat(TestAttempt $attempt)
+    {
+        $this->authorizeAttempt($attempt);
+
+        return response()->json([
+            'reset' => false,
+            'active' => $attempt->status === AttemptStatus::SedangDikerjakan && ! $attempt->isExpired(),
+            'finished' => $attempt->status === AttemptStatus::Selesai,
+            'expired' => $attempt->isExpired(),
+            'deadline' => $attempt->deadline?->timestamp,
+            'server_time' => now()->timestamp,
+        ]);
+    }
+
+    /**
      * Catat pelanggaran (siswa keluar dari aplikasi saat ujian).
      * Capai ambang -> auto-submit + blokir akun (sama seperti versi web).
      */
@@ -193,6 +212,15 @@ class ExamController extends Controller
         abort_unless($attempt->user_id === auth()->id(), 403);
     }
 
+    /**
+     * URL penuh file di disk publik, MENGIKUTI host permintaan (bukan APP_URL),
+     * agar dapat diakses klien Android (IP LAN) maupun web (localhost).
+     */
+    private function publicUrl(?string $path): ?string
+    {
+        return $path ? url('storage/'.ltrim($path, '/')) : null;
+    }
+
     private function ensureActive(TestAttempt $attempt): void
     {
         if ($attempt->status === AttemptStatus::Selesai) {
@@ -225,7 +253,7 @@ class ExamController extends Controller
                     'id' => $c->id,
                     'label' => $c->label,
                     'teks' => $c->teks,
-                    'gambar' => $c->gambar,
+                    'gambar' => $this->publicUrl($c->gambar),
                 ])->values();
 
             return [
@@ -233,8 +261,10 @@ class ExamController extends Controller
                 'urutan' => $aq->urutan,
                 'tipe' => $q->tipe->value,
                 'pertanyaan' => $q->pertanyaan,
-                'gambar' => $q->gambar,
-                'video_url' => $q->video_url,
+                'gambar' => $this->publicUrl($q->gambar),
+                // Video file upload -> URL mengikuti host (agar terjangkau HP); link eksternal apa adanya.
+                'video_url' => $q->video_path ? $this->publicUrl($q->video_path) : $q->video_url,
+                'suara' => $this->publicUrl($q->suara),
                 'choices' => $q->tipe === QuestionType::Essay ? [] : $choices,
                 'choice_id' => $answer?->choice_id,
                 'jawaban_essay' => $answer?->jawaban_essay,

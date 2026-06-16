@@ -8,6 +8,7 @@ use App\Filament\Resources\TestAttemptResource\RelationManagers\AnswersRelationM
 use App\Models\TestAttempt;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -81,10 +82,12 @@ class TestAttemptResource extends Resource
                     ->dateTime()
                     ->sortable(),
             ])
+            ->paginated([10, 25, 50, 100])
+            ->defaultPaginationPageOption(25)
+            ->emptyStateIcon('heroicon-o-chart-bar')
+            ->emptyStateHeading('Pilih ujian')
+            ->emptyStateDescription('Klik tombol "Lihat Hasil" pada salah satu kartu ujian di atas untuk menampilkan peserta & hasilnya.')
             ->filters([
-                Tables\Filters\SelectFilter::make('test_id')
-                    ->relationship('test', 'judul')
-                    ->label('Ujian'),
                 Tables\Filters\SelectFilter::make('status')
                     ->options(AttemptStatus::class),
                 Tables\Filters\Filter::make('ada_pelanggaran')
@@ -92,10 +95,46 @@ class TestAttemptResource extends Resource
                     ->query(fn (\Illuminate\Database\Eloquent\Builder $query) => $query->where('pelanggaran', '>', 0)),
             ])
             ->actions([
+                Tables\Actions\Action::make('keluarkan')
+                    ->label('Keluarkan')
+                    ->icon('heroicon-o-arrow-right-on-rectangle')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Keluarkan & reset peserta ini?')
+                    ->modalDescription('Sesi dan jawaban peserta ini akan DIHAPUS. Setelah soal diperbaiki, ia bisa memulai ujian lagi dari awal dengan soal terbaru.')
+                    ->modalSubmitActionLabel('Ya, keluarkan')
+                    ->action(function (TestAttempt $record) {
+                        $record->delete(); // cascade: jawaban & snapshot soal ikut terhapus
+                        Notification::make()
+                            ->title('Peserta dikeluarkan')
+                            ->body('Peserta direset & dapat memulai ujian lagi setelah soal diperbaiki.')
+                            ->success()
+                            ->send();
+                    }),
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkAction::make('keluarkan')
+                        ->label('Keluarkan & reset')
+                        ->icon('heroicon-o-arrow-right-on-rectangle')
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->modalHeading('Keluarkan & reset peserta terpilih?')
+                        ->modalDescription('Sesi dan jawaban peserta yang dipilih akan DIHAPUS. Setelah soal diperbaiki, mereka bisa memulai ujian lagi dari awal dengan soal terbaru.')
+                        ->modalSubmitActionLabel('Ya, keluarkan')
+                        ->action(function (\Illuminate\Support\Collection $records) {
+                            $jumlah = $records->count();
+                            // Hapus attempt -> jawaban & snapshot soal ikut terhapus (cascade).
+                            $records->each(fn (TestAttempt $a) => $a->delete());
+
+                            Notification::make()
+                                ->title('Peserta dikeluarkan')
+                                ->body("{$jumlah} peserta direset. Mereka dapat memulai ujian lagi setelah soal diperbaiki.")
+                                ->success()
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
@@ -121,6 +160,8 @@ class TestAttemptResource extends Resource
         return [
             'index' => Pages\ListTestAttempts::route('/'),
             'edit' => Pages\EditTestAttempt::route('/{record}/edit'),
+            'live' => Pages\LiveHasil::route('/live/{test}'),
+            'riwayat' => Pages\RiwayatPelanggaran::route('/riwayat/{test}'),
         ];
     }
 }

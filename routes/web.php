@@ -17,9 +17,21 @@ Route::view('profile', 'profile')
 // ---- Ruang Ujian Siswa ----
 Route::middleware('auth')->group(function () {
     Route::get('/ujian', [ExamController::class, 'index'])->name('exam.index');
+
+    // Halaman pemberitahuan saat ujian dihentikan/di-reset pengawas.
+    Route::get('/ujian/dihentikan', fn () => view('exam.kicked', [
+        'title' => \App\Models\Setting::kickTitle(),
+        'message' => \App\Models\Setting::kickMessage(),
+    ]))->name('exam.kicked');
+
     Route::post('/ujian/{test}/mulai', [ExamController::class, 'start'])->name('exam.start');
-    Route::get('/ujian/attempt/{attempt}', ExamRoom::class)->name('exam.room');
-    Route::get('/ujian/attempt/{attempt}/hasil', [ExamController::class, 'result'])->name('exam.result');
+    Route::get('/ujian/attempt/{attempt}', ExamRoom::class)
+        ->name('exam.room')
+        // Attempt sudah direset/dihapus pengawas -> jangan 404, tampilkan pemberitahuan.
+        ->missing(fn () => redirect()->route('exam.kicked'));
+    Route::get('/ujian/attempt/{attempt}/hasil', [ExamController::class, 'result'])
+        ->name('exam.result')
+        ->missing(fn () => redirect()->route('exam.kicked'));
 });
 
 // DEBUG SEMENTARA: cek batas upload server yang sedang berjalan. Hapus setelah selesai.

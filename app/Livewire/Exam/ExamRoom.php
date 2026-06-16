@@ -141,7 +141,7 @@ class ExamRoom extends Component
      */
     public function saveAnswer(int $choiceId): void
     {
-        if ($this->guardTime()) {
+        if ($this->bailIfReset() || $this->guardTime()) {
             return;
         }
 
@@ -161,7 +161,7 @@ class ExamRoom extends Component
      */
     public function updatedEssayDraft(?string $value): void
     {
-        if ($this->guardTime() || ! $this->current) {
+        if ($this->bailIfReset() || $this->guardTime() || ! $this->current) {
             return;
         }
 
@@ -178,7 +178,7 @@ class ExamRoom extends Component
      */
     public function toggleFlag(): void
     {
-        if (! $this->current) {
+        if ($this->bailIfReset() || ! $this->current) {
             return;
         }
 
@@ -192,6 +192,10 @@ class ExamRoom extends Component
      */
     public function recordViolation()
     {
+        if ($this->bailIfReset()) {
+            return null;
+        }
+
         $max = $this->maxPelanggaran;
 
         if ($max <= 0 || $this->attempt->status === AttemptStatus::Selesai) {
@@ -218,6 +222,9 @@ class ExamRoom extends Component
 
     public function next(): void
     {
+        if ($this->bailIfReset()) {
+            return;
+        }
         if ($this->index < $this->questions->count() - 1) {
             $this->index++;
             $this->loadCurrentAnswer();
@@ -226,6 +233,9 @@ class ExamRoom extends Component
 
     public function prev(): void
     {
+        if ($this->bailIfReset()) {
+            return;
+        }
         if ($this->index > 0) {
             $this->index--;
             $this->loadCurrentAnswer();
@@ -234,6 +244,9 @@ class ExamRoom extends Component
 
     public function goTo(int $i): void
     {
+        if ($this->bailIfReset()) {
+            return;
+        }
         $this->index = max(0, min($i, $this->questions->count() - 1));
         $this->loadCurrentAnswer();
     }
@@ -243,6 +256,10 @@ class ExamRoom extends Component
      */
     public function finish()
     {
+        if ($this->bailIfReset()) {
+            return null;
+        }
+
         return $this->closeAttempt();
     }
 
@@ -251,6 +268,37 @@ class ExamRoom extends Component
         app(ExamSessionService::class)->finish($this->attempt);
 
         return $this->redirectRoute('exam.result', $this->attemptId, navigate: true);
+    }
+
+    /**
+     * Denyut nadi (dipanggil wire:poll). Bila pengawas mereset attempt, siswa
+     * langsung dikeluarkan secara real-time. Aman terhadap koneksi: bila request
+     * poll gagal (offline), Livewire hanya mengulang — TIDAK menendang siswa,
+     * karena keluar hanya terjadi saat server memastikan attempt sudah hilang.
+     */
+    public function heartbeat(): void
+    {
+        if ($this->bailIfReset()) {
+            return; // sedang diarahkan ke halaman pemberitahuan
+        }
+
+        // Masih aktif -> tak perlu render ulang (hemat & tak ganggu timer/jawaban).
+        $this->skipRender();
+    }
+
+    /**
+     * Bila attempt sudah direset/dikeluarkan pengawas, arahkan siswa ke halaman
+     * pemberitahuan full-screen (alih-alih error). Dipanggil di awal tiap aksi & heartbeat.
+     */
+    private function bailIfReset(): bool
+    {
+        if (TestAttempt::whereKey($this->attemptId)->exists()) {
+            return false;
+        }
+
+        $this->redirectRoute('exam.kicked');
+
+        return true;
     }
 
     /**
