@@ -1,21 +1,42 @@
 <?php
 
 use App\Http\Controllers\ExamController;
+use App\Http\Middleware\EnsureAccountCompleted;
 use App\Livewire\Exam\ExamRoom;
 use Illuminate\Support\Facades\Route;
+use Livewire\Volt\Volt;
 
 Route::view('/', 'welcome');
 
+// Login pertama siswa: wajib ganti password & isi email aktif.
+Volt::route('akun/lengkapi', 'pages.akun.lengkapi')
+    ->middleware('auth')
+    ->name('akun.lengkapi');
+
 Route::view('dashboard', 'dashboard')
-    ->middleware(['auth', 'verified'])
+    ->middleware(['auth', 'verified', EnsureAccountCompleted::class])
     ->name('dashboard');
 
 Route::view('profile', 'profile')
     ->middleware(['auth'])
     ->name('profile');
 
+// ---- Cetak Kartu Ujian Siswa (admin) ----
+Route::middleware('auth')->get('/cetak-kartu', function (\Illuminate\Http\Request $request) {
+    abort_unless((bool) auth()->user()?->isAdmin(), 403);
+
+    return view('kartu-ujian', ['siswa' => \App\Services\KartuUjianExport::resolveSiswa($request)]);
+})->name('kartu.ujian');
+
+// Download Kartu Ujian sebagai Word (.docx).
+Route::middleware('auth')->get('/cetak-kartu-word', function (\Illuminate\Http\Request $request) {
+    abort_unless((bool) auth()->user()?->isAdmin(), 403);
+
+    return app(\App\Services\KartuUjianExport::class)->word(\App\Services\KartuUjianExport::resolveSiswa($request));
+})->name('kartu.word');
+
 // ---- Ruang Ujian Siswa ----
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', EnsureAccountCompleted::class])->group(function () {
     Route::get('/ujian', [ExamController::class, 'index'])->name('exam.index');
 
     // Halaman pemberitahuan saat ujian dihentikan/di-reset pengawas.

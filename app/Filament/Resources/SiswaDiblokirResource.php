@@ -14,6 +14,11 @@ class SiswaDiblokirResource extends Resource
 {
     protected static ?string $model = User::class;
 
+    public static function canViewAny(): bool
+    {
+        return (bool) auth()->user()?->hasRole('operator', 'admin', 'superadmin');
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-lock-closed';
 
     protected static ?string $navigationLabel = 'Siswa Diblokir';

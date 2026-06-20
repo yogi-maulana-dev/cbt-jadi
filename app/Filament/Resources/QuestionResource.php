@@ -30,6 +30,11 @@ class QuestionResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Bank Soal';
 
+    public static function canViewAny(): bool
+    {
+        return (bool) auth()->user()?->hasRole('guru', 'admin', 'superadmin');
+    }
+
     /**
      * Guru (operator) hanya melihat soal mapel yang ditugaskan padanya.
      * Admin melihat semua.
@@ -39,7 +44,7 @@ class QuestionResource extends Resource
         $query = parent::getEloquentQuery();
         $user = auth()->user();
 
-        if ($user && $user->role === 'operator') {
+        if ($user && $user->isGuru()) {
             $query->whereIn('mata_pelajaran_id', $user->mataPelajaranIds());
         }
 
@@ -65,7 +70,7 @@ class QuestionResource extends Resource
                     Forms\Components\Select::make('mata_pelajaran_id')
                         ->relationship('mataPelajaran', 'nama', function (Builder $query) {
                             $user = auth()->user();
-                            if ($user && $user->role === 'operator') {
+                            if ($user && $user->isGuru()) {
                                 $query->whereIn('id', $user->mataPelajaranIds());
                             }
                         })
@@ -248,7 +253,7 @@ class QuestionResource extends Resource
                     ->visible(fn (): bool => (bool) auth()->user()?->isAdmin()),
                 Tables\Filters\SelectFilter::make('guru')
                     ->label('Guru')
-                    ->options(fn (): array => User::where('role', 'operator')->orderBy('name')->pluck('name', 'id')->all())
+                    ->options(fn (): array => User::where('role', 'guru')->orderBy('name')->pluck('name', 'id')->all())
                     ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null)
                         ? $query->whereHas('mataPelajaran.gurus', fn ($q) => $q->where('users.id', $data['value']))
                         : $query)
@@ -306,7 +311,7 @@ class QuestionResource extends Resource
                     ->action(function (array $data): void {
                         $file = is_array($data['file']) ? reset($data['file']) : $data['file'];
                         $user = auth()->user();
-                        $allowed = ($user && $user->role === 'operator') ? $user->mataPelajaranIds() : null;
+                        $allowed = ($user && $user->isGuru()) ? $user->mataPelajaranIds() : null;
 
                         $report = app(BankSoalImport::class)->import($file->getRealPath(), $user?->id, $allowed);
 
@@ -385,7 +390,7 @@ class QuestionResource extends Resource
             ->where('media_pending', true);
 
         $user = auth()->user();
-        if ($user && $user->role === 'operator') {
+        if ($user && $user->isGuru()) {
             $query->where('created_by', $user->id);
         }
 
@@ -413,7 +418,7 @@ class QuestionResource extends Resource
         $query = Question::query()->where('media_pending', true);
 
         $user = auth()->user();
-        if ($user && $user->role === 'operator') {
+        if ($user && $user->isGuru()) {
             $query->where('created_by', $user->id);
         }
 

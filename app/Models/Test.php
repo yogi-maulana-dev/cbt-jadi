@@ -63,6 +63,59 @@ class Test extends Model
     }
 
     /**
+     * Penempatan siswa ke ruangan untuk jadwal ini.
+     */
+    public function penempatanSiswa(): HasMany
+    {
+        return $this->hasMany(PenempatanSiswa::class);
+    }
+
+    /**
+     * Pengawas ujian ini (banyak pengawas per jadwal, masing-masing punya ruangan).
+     */
+    public function pengawas(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'test_pengawas')
+            ->withPivot('ruangan')
+            ->withTimestamps();
+    }
+
+    /**
+     * Pesan bentrok: pengawas ujian ini yang juga mengawasi ujian LAIN pada waktu
+     * yang berbarengan (butuh jadwal mulai & selesai terisi). Mengembalikan nama pengawas.
+     *
+     * @return array<int, string>
+     */
+    public function konflikPengawas(): array
+    {
+        if (! $this->waktu_mulai || ! $this->waktu_selesai) {
+            return [];
+        }
+
+        $this->loadMissing('pengawas');
+
+        $bentrok = static::query()
+            ->where('id', '!=', $this->id)
+            ->whereNotNull('waktu_mulai')->whereNotNull('waktu_selesai')
+            ->where('waktu_mulai', '<', $this->waktu_selesai)
+            ->where('waktu_selesai', '>', $this->waktu_mulai)
+            ->with('pengawas')
+            ->get();
+
+        $msgs = [];
+        foreach ($this->pengawas as $pg) {
+            foreach ($bentrok as $o) {
+                if ($o->pengawas->contains('id', $pg->id)) {
+                    $msgs[] = $pg->name.' juga mengawasi "'.$o->judul.'" pada waktu yang berbarengan'
+                        .($o->waktu_mulai ? ' ('.$o->waktu_mulai->format('d/m H:i').')' : '').'.';
+                }
+            }
+        }
+
+        return array_values(array_unique($msgs));
+    }
+
+    /**
      * Ada siswa yang sedang mengerjakan ujian ini (belum selesai & waktu belum habis)?
      */
     public function hasActiveAttempts(): bool

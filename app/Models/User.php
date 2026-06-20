@@ -4,13 +4,15 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
@@ -23,8 +25,13 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'no_ujian',
+        'kelas',
+        'program_studi',
+        'must_change_password',
         'password',
         'role',
+        'aktif',
         'diblokir',
         'diblokir_pada',
         'alasan_blokir',
@@ -47,6 +54,15 @@ class User extends Authenticatable
      *
      * @return array<string, string>
      */
+    /**
+     * Nilai default atribut untuk instance baru.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'aktif' => true,
+    ];
+
     protected function casts(): array
     {
         return [
@@ -54,6 +70,8 @@ class User extends Authenticatable
             'password' => 'hashed',
             'diblokir' => 'boolean',
             'diblokir_pada' => 'datetime',
+            'must_change_password' => 'boolean',
+            'aktif' => 'boolean',
         ];
     }
 
@@ -163,5 +181,45 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return in_array($this->role, ['admin', 'superadmin'], true);
+    }
+
+    public function isOperator(): bool
+    {
+        return $this->role === 'operator';
+    }
+
+    public function isGuru(): bool
+    {
+        return $this->role === 'guru';
+    }
+
+    public function isPengawas(): bool
+    {
+        return $this->role === 'pengawas';
+    }
+
+    /**
+     * Ujian (jadwal) yang diawasi user ini (relasi balik dari Test::pengawas()).
+     * Dinamai `tests` agar Filament RelationManager dapat menebak relasi balik.
+     */
+    public function tests(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Test::class, 'test_pengawas')
+            ->withPivot('ruangan')
+            ->withTimestamps();
+    }
+
+    /** Alias yang lebih jelas untuk dipakai di aplikasi. */
+    public function ujianDiawasi(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->tests();
+    }
+
+    /**
+     * Hanya guru/operator/admin/superadmin yang boleh masuk panel admin. Siswa diblokir.
+     */
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return $this->aktif && in_array($this->role, ['guru', 'operator', 'pengawas', 'admin', 'superadmin'], true);
     }
 }

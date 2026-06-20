@@ -14,6 +14,11 @@ class JurusanResource extends Resource
 {
     protected static ?string $model = Jurusan::class;
 
+    public static function canViewAny(): bool
+    {
+        return (bool) auth()->user()?->isAdmin();
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-academic-cap';
 
     protected static ?string $navigationLabel = 'Jurusan';

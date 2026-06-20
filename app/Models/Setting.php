@@ -38,4 +38,45 @@ class Setting extends Model
     {
         return static::get('exam_kick_message', self::DEFAULT_KICK_MESSAGE);
     }
+
+    // ----- Identitas sekolah (untuk Kartu Ujian) -----
+
+    public static function namaSekolah(): string
+    {
+        return static::get('nama_sekolah', 'NAMA SEKOLAH');
+    }
+
+    public static function tahunPelajaran(): string
+    {
+        return static::get('tahun_pelajaran', date('Y').'/'.(date('Y') + 1));
+    }
+
+    public static function kepalaSekolah(): string
+    {
+        return static::get('kepala_sekolah', '');
+    }
+
+    public static function judulKartu(): string
+    {
+        return static::get('judul_kartu', 'KARTU UJIAN');
+    }
+
+    /** Path logo sekolah (header/atas) di disk publik, atau null. */
+    public static function logoSekolah(): ?string
+    {
+        return static::get('logo_sekolah');
+    }
+
+    /** Path logo bawah (footer) di disk publik, atau null. */
+    public static function logoBawah(): ?string
+    {
+        return static::get('logo_bawah');
+    }
+
+    /** Path gambar tanda tangan kepala sekolah, atau null. */
+    public static function ttdGambar(): ?string
+    {
+        return static::get('ttd_gambar');
+    }
 }
+

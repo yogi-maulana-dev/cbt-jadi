@@ -17,6 +17,36 @@ class TestAttemptResource extends Resource
 {
     protected static ?string $model = TestAttempt::class;
 
+    public static function canViewAny(): bool
+    {
+        return (bool) auth()->user()?->hasRole('guru', 'admin', 'superadmin');
+    }
+
+    /** Guru hanya MELIHAT hasil ujian; ubah/hapus hanya admin. */
+    public static function canEdit($record): bool
+    {
+        return (bool) auth()->user()?->isAdmin();
+    }
+
+    public static function canDelete($record): bool
+    {
+        return (bool) auth()->user()?->isAdmin();
+    }
+
+    /**
+     * Operator (guru) hanya melihat hasil ujian pada mapel yang ditugaskan padanya.
+     */
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        $query = parent::getEloquentQuery();
+        $user = auth()->user();
+        if ($user && $user->isGuru()) {
+            $query->whereHas('test', fn ($q) => $q->whereIn('mata_pelajaran_id', $user->mataPelajaranIds()));
+        }
+
+        return $query;
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
 
     protected static ?string $navigationLabel = 'Hasil Ujian';
@@ -99,6 +129,7 @@ class TestAttemptResource extends Resource
                     ->label('Keluarkan')
                     ->icon('heroicon-o-arrow-right-on-rectangle')
                     ->color('danger')
+                    ->visible(fn (): bool => (bool) auth()->user()?->isAdmin())
                     ->requiresConfirmation()
                     ->modalHeading('Keluarkan & reset peserta ini?')
                     ->modalDescription('Sesi dan jawaban peserta ini akan DIHAPUS. Setelah soal diperbaiki, ia bisa memulai ujian lagi dari awal dengan soal terbaru.')
@@ -111,7 +142,8 @@ class TestAttemptResource extends Resource
                             ->success()
                             ->send();
                     }),
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->visible(fn (): bool => (bool) auth()->user()?->isAdmin()),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -119,6 +151,7 @@ class TestAttemptResource extends Resource
                         ->label('Keluarkan & reset')
                         ->icon('heroicon-o-arrow-right-on-rectangle')
                         ->color('danger')
+                        ->visible(fn (): bool => (bool) auth()->user()?->isAdmin())
                         ->requiresConfirmation()
                         ->modalHeading('Keluarkan & reset peserta terpilih?')
                         ->modalDescription('Sesi dan jawaban peserta yang dipilih akan DIHAPUS. Setelah soal diperbaiki, mereka bisa memulai ujian lagi dari awal dengan soal terbaru.')
@@ -135,7 +168,8 @@ class TestAttemptResource extends Resource
                                 ->send();
                         })
                         ->deselectRecordsAfterCompletion(),
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->visible(fn (): bool => (bool) auth()->user()?->isAdmin()),
                 ]),
             ]);
     }

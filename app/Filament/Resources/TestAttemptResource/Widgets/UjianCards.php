@@ -26,10 +26,13 @@ class UjianCards extends Widget
      */
     public function getUjian(): Collection
     {
+        $user = auth()->user();
+
         return Test::query()
             ->with('mataPelajaran:id,nama,kode')
             ->withCount('attempts')
             ->withCount(['attempts as sedang_count' => fn ($q) => $q->where('status', AttemptStatus::SedangDikerjakan)])
+            ->when($user && $user->isGuru(), fn ($q) => $q->whereIn('mata_pelajaran_id', $user->mataPelajaranIds()))
             ->when($this->search !== '', function ($q) {
                 $term = '%'.$this->search.'%';
                 $q->where(function ($qq) use ($term) {

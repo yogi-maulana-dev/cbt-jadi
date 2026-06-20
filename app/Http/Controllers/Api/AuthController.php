@@ -17,7 +17,7 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $data = $request->validate([
-            'email' => ['required', 'email'],
+            'email' => ['required', 'string'], // No Ujian (siswa) atau email
             'password' => ['required'],
             'device_name' => ['nullable', 'string'],
             'captcha_id' => ['required', 'string'],
@@ -32,11 +32,18 @@ class AuthController extends Controller
             ]);
         }
 
-        $user = User::where('email', $data['email'])->first();
+        $login = trim($data['email']);
+        $user = User::where('email', $login)->orWhere('no_ujian', $login)->first();
 
         if (! $user || ! Hash::check($data['password'], $user->password)) {
             throw ValidationException::withMessages([
-                'email' => ['Email atau kata sandi salah.'],
+                'email' => ['No Ujian/email atau kata sandi salah.'],
+            ]);
+        }
+
+        if (! $user->aktif) {
+            throw ValidationException::withMessages([
+                'email' => ['Akun Anda dinonaktifkan. Hubungi admin sekolah.'],
             ]);
         }
 

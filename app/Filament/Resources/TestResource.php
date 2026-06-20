@@ -18,6 +18,28 @@ class TestResource extends Resource
 {
     protected static ?string $model = Test::class;
 
+    public static function canViewAny(): bool
+    {
+        // Operator: lihat jadwal ujian (read-only). Admin: kelola penuh.
+        return (bool) auth()->user()?->hasRole('operator', 'admin', 'superadmin');
+    }
+
+    /** Hanya admin yang boleh membuat/ubah/hapus ujian; operator hanya melihat. */
+    public static function canCreate(): bool
+    {
+        return (bool) auth()->user()?->isAdmin();
+    }
+
+    public static function canEdit($record): bool
+    {
+        return (bool) auth()->user()?->isAdmin();
+    }
+
+    public static function canDelete($record): bool
+    {
+        return (bool) auth()->user()?->isAdmin();
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
     protected static ?string $navigationLabel = 'Ujian';
@@ -132,6 +154,7 @@ class TestResource extends Resource
                     ->label('Ubah Token')
                     ->icon('heroicon-o-key')
                     ->color('warning')
+                    ->visible(fn (): bool => (bool) auth()->user()?->isAdmin())
                     ->fillForm(fn (Test $record): array => ['token' => $record->token])
                     ->form([
                         Forms\Components\TextInput::make('token')
@@ -155,8 +178,8 @@ class TestResource extends Resource
                     ->label('Keluarkan Peserta')
                     ->icon('heroicon-o-arrow-right-on-rectangle')
                     ->color('danger')
-                    ->visible(fn (Test $record): bool => $record->attempts()
-                        ->where('status', \App\Enums\AttemptStatus::SedangDikerjakan)->exists())
+                    ->visible(fn (Test $record): bool => (bool) auth()->user()?->isAdmin()
+                        && $record->attempts()->where('status', \App\Enums\AttemptStatus::SedangDikerjakan)->exists())
                     ->requiresConfirmation()
                     ->modalHeading('Keluarkan SEMUA peserta yang sedang mengerjakan?')
                     ->modalDescription('Semua peserta yang sedang mengerjakan ujian ini akan dikeluarkan & sesinya direset. Hasil peserta yang sudah SELESAI tidak terhapus. Setelah soal diperbaiki, mereka bisa mulai lagi.')
@@ -173,11 +196,13 @@ class TestResource extends Resource
                             ->success()
                             ->send();
                     }),
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->visible(fn (): bool => (bool) auth()->user()?->isAdmin()),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()
+                        ->visible(fn (): bool => (bool) auth()->user()?->isAdmin())
                         ->before(function (\Illuminate\Support\Collection $records, Tables\Actions\DeleteBulkAction $action) {
                             $aktif = $records->filter->hasActiveAttempts();
                             if ($aktif->isNotEmpty()) {
@@ -199,6 +224,8 @@ class TestResource extends Resource
     {
         return [
             QuestionsRelationManager::class,
+            \App\Filament\Resources\TestResource\RelationManagers\PengawasRelationManager::class,
+            \App\Filament\Resources\TestResource\RelationManagers\PenempatanSiswaRelationManager::class,
         ];
     }
 

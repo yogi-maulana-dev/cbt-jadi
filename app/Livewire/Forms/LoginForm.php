@@ -2,8 +2,10 @@
 
 namespace App\Livewire\Forms;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -12,7 +14,8 @@ use Livewire\Form;
 
 class LoginForm extends Form
 {
-    #[Validate('required|string|email')]
+    // Identitas login: No Ujian (siswa) ATAU email.
+    #[Validate('required|string')]
     public string $email = '';
 
     #[Validate('required|string')]
@@ -30,7 +33,9 @@ class LoginForm extends Form
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only(['email', 'password']), $this->remember)) {
+        $user = $this->resolveUser();
+
+        if (! $user || ! Hash::check($this->password, $user->password)) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
@@ -38,16 +43,33 @@ class LoginForm extends Form
             ]);
         }
 
-        // Tolak siswa yang diblokir karena pelanggaran.
-        if (Auth::user()->isBlocked()) {
-            Auth::logout();
+        // Akun dinonaktifkan admin.
+        if (! $user->aktif) {
+            throw ValidationException::withMessages([
+                'form.email' => 'Akun Anda dinonaktifkan. Hubungi admin sekolah.',
+            ]);
+        }
 
+        // Tolak siswa yang diblokir karena pelanggaran.
+        if ($user->isBlocked()) {
             throw ValidationException::withMessages([
                 'form.email' => 'Akun Anda diblokir karena pelanggaran saat ujian. Hubungi operator atau admin untuk membuka blokir.',
             ]);
         }
 
+        Auth::login($user, $this->remember);
+
         RateLimiter::clear($this->throttleKey());
+    }
+
+    /**
+     * Cari user dari identitas login: No Ujian (siswa) atau email.
+     */
+    public function resolveUser(): ?User
+    {
+        $id = trim($this->email);
+
+        return User::where('email', $id)->orWhere('no_ujian', $id)->first();
     }
 
     /**

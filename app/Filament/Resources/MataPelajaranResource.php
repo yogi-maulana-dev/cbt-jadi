@@ -17,6 +17,11 @@ class MataPelajaranResource extends Resource
 {
     protected static ?string $model = MataPelajaran::class;
 
+    public static function canViewAny(): bool
+    {
+        return (bool) auth()->user()?->isAdmin();
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-book-open';
 
     protected static ?string $navigationLabel = 'Mata Pelajaran';
@@ -45,7 +50,7 @@ class MataPelajaranResource extends Resource
                     ->maxLength(255),
                 Forms\Components\Select::make('gurus')
                     ->label('Guru pengampu')
-                    ->relationship('gurus', 'name', fn (Builder $query) => $query->where('role', 'operator'))
+                    ->relationship('gurus', 'name', fn (Builder $query) => $query->where('role', 'guru'))
                     ->multiple()
                     ->preload()
                     ->searchable()

@@ -27,7 +27,7 @@ class MapelCards extends Widget
             ->withCount(['questions as media_pending_count' => fn ($q) => $q->where('media_pending', true)]);
 
         $user = auth()->user();
-        if ($user && $user->role === 'operator') {
+        if ($user && $user->isGuru()) {
             $query->whereIn('id', $user->mataPelajaranIds());
         }
 

@@ -23,7 +23,7 @@ new #[Layout('layouts.guest')] class extends Component
         $this->validate();
 
         // Kredensial benar tapi akun diblokir -> tampilkan layar tunggu (real-time).
-        $user = User::where('email', $this->form->email)->first();
+        $user = $this->form->resolveUser();
         if ($user && $user->isBlocked() && Hash::check($this->form->password, $user->password)) {
             $this->blocked = true;
             $this->unblockedMessage = null;
@@ -49,7 +49,7 @@ new #[Layout('layouts.guest')] class extends Component
             return;
         }
 
-        $user = User::where('email', $this->form->email)->first();
+        $user = $this->form->resolveUser();
 
         if (! $user || ! $user->isBlocked()) {
             $this->blocked = false;
@@ -86,10 +86,10 @@ new #[Layout('layouts.guest')] class extends Component
         </div>
     @else
         <form wire:submit="login">
-            <!-- Email Address -->
+            <!-- No Ujian / Email -->
             <div>
-                <x-input-label for="email" :value="__('Email')" />
-                <x-text-input wire:model="form.email" id="email" class="block mt-1 w-full" type="email" name="email" required autofocus autocomplete="username" />
+                <x-input-label for="email" :value="__('No Ujian / Email')" />
+                <x-text-input wire:model="form.email" id="email" class="block mt-1 w-full" type="text" name="email" required autofocus autocomplete="username" placeholder="No Ujian atau email" />
                 <x-input-error :messages="$errors->get('form.email')" class="mt-2" />
             </div>
 

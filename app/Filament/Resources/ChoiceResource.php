@@ -14,6 +14,11 @@ class ChoiceResource extends Resource
 {
     protected static ?string $model = Choice::class;
 
+    public static function canViewAny(): bool
+    {
+        return (bool) auth()->user()?->isAdmin();
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-list-bullet';
 
     protected static ?string $navigationLabel = 'Pilihan Jawaban';
